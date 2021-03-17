@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox alignment="center" xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8.0.171" fx:controller="ru.geekbrains.alexkrasnova.webchat.client.Controller">
+    <HBox fx:id="loginPanel">
+        <TextField fx:id="usernameField" promptText="Укажите свой ник" onAction="#login"  HBox.hgrow="ALWAYS" />
+        <Button onAction="#login" text="Войти" />
+    </HBox>
+    <TextArea fx:id="textArea" editable="false" VBox.vgrow="ALWAYS" />
+    <HBox fx:id="msgPanel" managed="false" visible="false">
+        <TextField fx:id="msgField" onAction="#sendMsg" promptText="Введите сообщение" HBox.hgrow="ALWAYS" />
+        <Button onAction="#sendMsg" text="Отправить" />
+    </HBox>
+
+</VBox>
