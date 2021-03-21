@@ -1,17 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<VBox alignment="center" xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8.0.171" fx:controller="ru.geekbrains.alexkrasnova.webchat.client.Controller">
+<VBox alignment="center" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ru.geekbrains.alexkrasnova.webchat.client.Controller">
+
     <HBox fx:id="loginPanel">
-        <TextField fx:id="usernameField" promptText="Укажите свой ник" onAction="#login"  HBox.hgrow="ALWAYS" />
-        <Button onAction="#login" text="Войти" />
+        <Label text="Логин">
+         <HBox.margin>
+            <Insets left="10.0" right="10.0" />
+         </HBox.margin></Label>
+        <TextField fx:id="loginField" onAction="#login" promptText="Введите логин..." HBox.hgrow="ALWAYS" />
+        <Label text="Пароль">
+         <HBox.margin>
+            <Insets left="20.0" right="10.0" />
+         </HBox.margin></Label>
+        <TextField fx:id="passwordField" onAction="#login" promptText="Введите пароль..." HBox.hgrow="ALWAYS" />
+        <Button maxWidth="150" minWidth="150" onAction="#login" prefWidth="150" text="Вход" />
     </HBox>
-    <TextArea fx:id="textArea" editable="false" VBox.vgrow="ALWAYS" />
-    <HBox fx:id="msgPanel" managed="false" visible="false">
-        <TextField fx:id="msgField" onAction="#sendMsg" promptText="Введите сообщение" HBox.hgrow="ALWAYS" />
-        <Button onAction="#sendMsg" text="Отправить" />
+
+    <HBox VBox.vgrow="ALWAYS">
+        <TextArea fx:id="textArea" editable="false" wrapText="true" HBox.hgrow="ALWAYS" />
+       <VBox fx:id="rightPanel" HBox.hgrow="ALWAYS">
+            <Button fx:id="exitButton" maxWidth="150" minWidth="150" onAction="#exit" prefWidth="150" text="Выход" />
+            <ListView fx:id="clientsList" maxWidth="150" minWidth="150" prefWidth="150" />
+        </VBox>
+    </HBox>
+
+    <HBox fx:id="messagePanel" managed="false" visible="false">
+        <TextField fx:id="messageField" onAction="#sendMessage" promptText="Введите сообщение" HBox.hgrow="ALWAYS" />
+        <Button onAction="#sendMessage" text="Отправить" />
     </HBox>
 
 </VBox>

@@ -1,15 +1,14 @@
 package ru.geekbrains.alexkrasnova.webchat.server;
 
 import ru.geekbrains.alexkrasnova.webchat.server.exception.InvalidCommandMessageException;
-import ru.geekbrains.alexkrasnova.webchat.server.exception.LoginFailedException;
+import ru.geekbrains.alexkrasnova.webchat.server.exception.UsernameAlreadyExistsException;
+import ru.geekbrains.alexkrasnova.webchat.server.exception.loginFailedException.LoginFailedException;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.NoSuchClientException;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.util.Arrays;
-import java.util.List;
 
 public class ClientHandler {
 
@@ -21,16 +20,17 @@ public class ClientHandler {
     private final String WHO_AM_I = "/who_am_i";
     private final String PRIVATE_MESSAGE = "/w ";
     private final String ERROR = "/error ";
+    private final String CHANGE_NICKNAME = "/change_nickname ";
 
 
     private final Server SERVER;
     private final Socket SOCKET;
     private final DataInputStream IN;
     private final DataOutputStream OUT;
-    private String username;
+    private User user;
 
     public String getUsername() {
-        return username;
+        return user.getUsername();
     }
 
     public ClientHandler(Server server, Socket socket) throws IOException {
@@ -61,7 +61,7 @@ public class ClientHandler {
                         }
                         continue;
                     }
-                    server.broadcastMessage(username + ": " + message);
+                    server.broadcastMessage(user.getUsername() + ": " + message);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -82,13 +82,17 @@ public class ClientHandler {
         }
     }
 
-    public void sendMessage(String message) throws IOException {
-        OUT.writeUTF(message);
+    public void sendMessage(String message) {
+        try {
+            OUT.writeUTF(message);
+        } catch (IOException e) {
+            disconnect();
+        }
     }
 
     private void handleCommandMessage(String message) throws IOException, InvalidCommandMessageException {
         if (message.equals(WHO_AM_I)) {
-            sendMessage("Your nickname: " + username);
+            sendMessage("Ваш ник: " + user.getUsername());
         } else if (message.startsWith(PRIVATE_MESSAGE)) {
             String[] privatMessageArray = message.split("\\s");
             if (privatMessageArray.length >= 3) {
@@ -106,7 +110,32 @@ public class ClientHandler {
             }
         } else if(message.startsWith(PRIVATE_MESSAGE.split("\\s")[0])) {
             throw new InvalidCommandMessageException("Имя адресата не может быть пустым");
+        } else if (message.startsWith(CHANGE_NICKNAME)) {
+            String[] tokens = message.split("\\s");
+            if (tokens.length < 2) {
+                throw new InvalidCommandMessageException("Имя пользователя не может быть пустым");
+            }
+            String oldUsername = user.getUsername();
+            try {
+
+                user.setUsername(tokens[1]);
+                sendMessage(message);
+                SERVER.broadcastMessage("Клиент " + oldUsername + " сменил ник на " + user.getUsername());
+                SERVER.broadcastClientsList();
+            } catch (UsernameAlreadyExistsException e) {
+                sendMessage("/error " + e.getMessage());
+            }
+            /*            if(SERVER.isUserOnline(tokens[1])){
+                sendMessage("/error Данное имя пользователя уже занято");
+                return;
+            }
+
+            username = tokens[1];*/
+
+        } else if(message.startsWith(CHANGE_NICKNAME.split("\\s")[0])) {
+            throw new InvalidCommandMessageException("Имя пользователя не может быть пустым");
         }
+
     }
 
     private void login() throws IOException {
@@ -122,14 +151,18 @@ public class ClientHandler {
     }
 
     private void tryToLogin(String message) throws IOException, LoginFailedException {
-        String usernameFromLogin = message.split("\\s")[1];
+        String[] tokens = message.split("\\s");
+        String login = tokens[1];
+        String password = tokens[2];
+        String usernameFromLogin = SERVER.userService.checkCredentialsAndGetUsername(login, password);
 
-        if (SERVER.isNickBusy(usernameFromLogin)) {
+        if (SERVER.isUserOnline(usernameFromLogin)) {
             throw new LoginFailedException("Данное имя пользователя уже занято");
         }
 
-        username = usernameFromLogin;
-        sendMessage(LOGIN_OK + username);
+        user = SERVER.userService.getUserByLogin(login);
+
+        sendMessage(LOGIN_OK + user.getUsername());
         SERVER.subscribe(this);
     }
 
