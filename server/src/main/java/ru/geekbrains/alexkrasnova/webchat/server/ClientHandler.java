@@ -2,8 +2,9 @@ package ru.geekbrains.alexkrasnova.webchat.server;
 
 import ru.geekbrains.alexkrasnova.webchat.server.exception.InvalidCommandMessageException;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.UsernameAlreadyExistsException;
-import ru.geekbrains.alexkrasnova.webchat.server.exception.loginFailedException.LoginFailedException;
+import ru.geekbrains.alexkrasnova.webchat.server.exception.AuthenticationException;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.NoSuchClientException;
+import ru.geekbrains.alexkrasnova.webchat.server.user.User;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -117,8 +118,7 @@ public class ClientHandler {
             }
             String oldUsername = user.getUsername();
             try {
-
-                user.setUsername(tokens[1]);
+                user = SERVER.userService.changeUsernameAndGetUser(user.getLogin(), tokens[1]);
                 sendMessage(message);
                 SERVER.broadcastMessage("Клиент " + oldUsername + " сменил ник на " + user.getUsername());
                 SERVER.broadcastClientsList();
@@ -144,24 +144,18 @@ public class ClientHandler {
             try {
                 tryToLogin(message);
                 break;
-            } catch (LoginFailedException e) {
+            } catch (AuthenticationException e) {
                 sendMessage(LOGIN_FAILED + " " + e.getMessage());
             }
         }
     }
 
-    private void tryToLogin(String message) throws IOException, LoginFailedException {
+    private void tryToLogin(String message) throws IOException, AuthenticationException {
         String[] tokens = message.split("\\s");
         String login = tokens[1];
         String password = tokens[2];
-        String usernameFromLogin = SERVER.userService.checkCredentialsAndGetUsername(login, password);
-
-        if (SERVER.isUserOnline(usernameFromLogin)) {
-            throw new LoginFailedException("Данное имя пользователя уже занято");
-        }
-
-        user = SERVER.userService.getUserByLogin(login);
-
+        user = SERVER.userService.checkCredentialsAndGetUser(login, password);
+        //todo: Поставить защиту, чтобы нельзя было зайти с двух клиентов под одним ником
         sendMessage(LOGIN_OK + user.getUsername());
         SERVER.subscribe(this);
     }

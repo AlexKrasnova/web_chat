@@ -1,9 +1,10 @@
 package ru.geekbrains.alexkrasnova.webchat.server;
 
 import ru.geekbrains.alexkrasnova.webchat.server.exception.NoSuchClientException;
+import ru.geekbrains.alexkrasnova.webchat.server.user.service.DatabaseUserService;
+import ru.geekbrains.alexkrasnova.webchat.server.user.service.MemoryUserService;
+import ru.geekbrains.alexkrasnova.webchat.server.user.service.UserService;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -18,7 +19,7 @@ public class Server {
     public Server(int port) {
         this.port = port;
         clients = new ArrayList<>();
-        userService = initializeUserService();
+        userService = new MemoryUserService();
         try (ServerSocket serverSocket = new ServerSocket(port)) {
 
             System.out.println("Сервер запущен на порту " + port);
@@ -29,9 +30,12 @@ public class Server {
                 System.out.println("Клиент подключился");
                 new ClientHandler(this, socket);
             }
+
         } catch (IOException e) {
             e.printStackTrace();
         }
+        //todo: подумать, где правильно отключатья от бд, и стоит ли оставлять метод disconnect() в интерфейсе UserService
+        userService.disconnect();
     }
 
     public void subscribe(ClientHandler clientHandler) {
@@ -82,24 +86,6 @@ public class Server {
             }
         }
         return false;
-    }
-
-    private UserService initializeUserService() {
-        UserService userService = new UserService();
-        userService.addUser(new User("bob@gmail.com", "bob1997", "Bob"));
-        userService.addUser(new User("john@gmail.com", "john1990", "John"));
-        userService.addUser(new User("jack@gmail.com", "jack1980", "Jack"));
-        userService.addUser(new User("max@gmail.com", "1234", "Max"));
-        userService.addUser(new User("ann@gmail.com", "4321", "Ann"));
-        userService.addUser(new User("cathrine@gmail.com", "1111", "Cat"));
-        userService.addUser(new User("mary@gmail.com", "222", "Mary"));
-        userService.addUser(new User("vasya@yandex.ru", "1", "Vasya"));
-        userService.addUser(new User("gosha@yandex.ru", "22222", "Gosha"));
-        userService.addUser(new User("sasha@mail.ru", "333", "Sasha"));
-        userService.addUser(new User("yana@gmail.com", "666", "Yana"));
-        userService.addUser(new User("vika@mail.ru", "666", "Vika"));
-        userService.addUser(new User("oleg@mail.ru", "1234", "Oleg"));
-        return userService;
     }
 
 }

@@ -1,4 +1,4 @@
-package ru.geekbrains.alexkrasnova.webchat.server;
+package ru.geekbrains.alexkrasnova.webchat.server.user;
 
 public class User {
     private String login;
