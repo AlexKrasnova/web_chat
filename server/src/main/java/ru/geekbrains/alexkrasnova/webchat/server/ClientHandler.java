@@ -109,7 +109,7 @@ public class ClientHandler {
             } else {
                 throw new InvalidCommandMessageException("Текст личного сообщения не может быть пустым");
             }
-        } else if(message.startsWith(PRIVATE_MESSAGE.split("\\s")[0])) {
+        } else if (message.startsWith(PRIVATE_MESSAGE.split("\\s")[0])) {
             throw new InvalidCommandMessageException("Имя адресата не может быть пустым");
         } else if (message.startsWith(CHANGE_NICKNAME)) {
             String[] tokens = message.split("\\s");
@@ -132,7 +132,7 @@ public class ClientHandler {
 
             username = tokens[1];*/
 
-        } else if(message.startsWith(CHANGE_NICKNAME.split("\\s")[0])) {
+        } else if (message.startsWith(CHANGE_NICKNAME.split("\\s")[0])) {
             throw new InvalidCommandMessageException("Имя пользователя не может быть пустым");
         }
 
@@ -150,14 +150,20 @@ public class ClientHandler {
         }
     }
 
-    private void tryToLogin(String message) throws IOException, AuthenticationException {
+    private void tryToLogin(String message) throws AuthenticationException {
         String[] tokens = message.split("\\s");
         String login = tokens[1];
         String password = tokens[2];
-        user = SERVER.userService.checkCredentialsAndGetUser(login, password);
-        //todo: Поставить защиту, чтобы нельзя было зайти с двух клиентов под одним ником
+        User userTemp = SERVER.userService.checkCredentialsAndGetUser(login, password);
+        if (SERVER.isUserOnline(userTemp)) {
+            throw new AuthenticationException("Данная учетная запись уже используется");
+        }
+        user = userTemp;
         sendMessage(LOGIN_OK + user.getUsername());
         SERVER.subscribe(this);
     }
 
+    public User getUser() {
+        return user;
+    }
 }

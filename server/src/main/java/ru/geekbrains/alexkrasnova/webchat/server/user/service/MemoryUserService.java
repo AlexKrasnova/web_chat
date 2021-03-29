@@ -51,8 +51,7 @@ public class MemoryUserService implements UserService {
         throw new UsernameAlreadyExistsException();
     }
 
-    @Override
-    public boolean isUsernameBusy(String username) {
+    private boolean isUsernameBusy(String username) {
         for (Map.Entry<String, User> userEntry : users.entrySet()) {
             if (userEntry.getValue().getUsername().equals(username)) {
                 return true;
@@ -61,14 +60,8 @@ public class MemoryUserService implements UserService {
         return false;
     }
 
-    @Override
-    public User getUserByLogin(String login) {
+    private User getUserByLogin(String login) {
         return users.get(login);
-    }
-
-    @Override
-    public void disconnect() {
-
     }
 
     @Override

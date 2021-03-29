@@ -11,11 +11,8 @@ public interface UserService {
 
     void addUser(User user) throws UsernameAlreadyExistsException;
 
-    boolean isUsernameBusy(String username);
-
-    User getUserByLogin(String login);
-
-    void disconnect();
+    default void freeUpResources() {
+    }
 
     User changeUsernameAndGetUser(String login, String newUsername) throws UsernameAlreadyExistsException;
 }
