@@ -1,7 +1,6 @@
 package ru.geekbrains.alexkrasnova.webchat.server;
 
 import ru.geekbrains.alexkrasnova.webchat.server.exception.NoSuchClientException;
-import ru.geekbrains.alexkrasnova.webchat.server.user.User;
 import ru.geekbrains.alexkrasnova.webchat.server.user.service.DatabaseUserService;
 import ru.geekbrains.alexkrasnova.webchat.server.user.service.MemoryUserService;
 import ru.geekbrains.alexkrasnova.webchat.server.user.service.UserService;
@@ -20,7 +19,7 @@ public class Server {
     public Server(int port) {
         this.port = port;
         clients = new ArrayList<>();
-        userService = new DatabaseUserService();
+        userService = new MemoryUserService();
         try (ServerSocket serverSocket = new ServerSocket(port)) {
 
             System.out.println("Сервер запущен на порту " + port);
@@ -34,9 +33,9 @@ public class Server {
 
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            userService.freeUpResources();
         }
+        //todo: подумать, где правильно отключатья от бд, и стоит ли оставлять метод disconnect() в интерфейсе UserService
+        userService.disconnect();
     }
 
     public void subscribe(ClientHandler clientHandler) {
@@ -80,9 +79,9 @@ public class Server {
         }
     }
 
-    public boolean isUserOnline(User user) {
+    public boolean isUserOnline(String username) {
         for (ClientHandler clientHandler : clients) {
-            if (clientHandler.getUser().equals(user)) {
+            if (clientHandler.getUsername().equals(username)) {
                 return true;
             }
         }

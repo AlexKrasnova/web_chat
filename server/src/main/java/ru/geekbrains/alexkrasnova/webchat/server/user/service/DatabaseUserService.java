@@ -51,7 +51,8 @@ public class DatabaseUserService implements UserService {
         }
     }
 
-    private boolean isUsernameBusy(String username) {
+    @Override
+    public boolean isUsernameBusy(String username) {
         try (ResultSet rs = stmt.executeQuery("select * from users where username = '" + username + "';")) {
             if (rs.next()) {
                 return true;
@@ -62,7 +63,8 @@ public class DatabaseUserService implements UserService {
         return false;
     }
 
-    private User getUserByLogin(String login) {
+    @Override
+    public User getUserByLogin(String login) {
         try (ResultSet rs = stmt.executeQuery("select login, password, username from users where login = '" + login + "';")) {
             if (rs.next()) {
                 return new User(rs.getString(1), rs.getString(2), rs.getString(3));
@@ -86,11 +88,7 @@ public class DatabaseUserService implements UserService {
     }
 
     @Override
-    public void freeUpResources() {
-        disconnect();
-    }
-
-    private void disconnect() {
+    public void disconnect() {
         try {
             if (stmt != null) {
                 stmt.close();
@@ -108,7 +106,7 @@ public class DatabaseUserService implements UserService {
     }
 
     @Override
-    public User changeUsernameAndGetUser(String login, String newUsername) throws UsernameAlreadyExistsException {
+    public User changeUsernameAndGetUser(String login, String newUsername) throws UsernameAlreadyExistsException{
         try {
             stmt.executeUpdate("update users set username = '" + newUsername + "' where login = '" + login + "';");
             return getUserByLogin(login);
