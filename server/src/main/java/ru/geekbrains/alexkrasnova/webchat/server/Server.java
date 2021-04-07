@@ -3,7 +3,6 @@ package ru.geekbrains.alexkrasnova.webchat.server;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.NoSuchClientException;
 import ru.geekbrains.alexkrasnova.webchat.server.user.User;
 import ru.geekbrains.alexkrasnova.webchat.server.user.service.DatabaseUserService;
-import ru.geekbrains.alexkrasnova.webchat.server.user.service.MemoryUserService;
 import ru.geekbrains.alexkrasnova.webchat.server.user.service.UserService;
 
 import java.io.IOException;
@@ -21,6 +20,7 @@ public class Server {
         this.port = port;
         clients = new ArrayList<>();
         userService = new DatabaseUserService();
+        userService.init();
         try (ServerSocket serverSocket = new ServerSocket(port)) {
 
             System.out.println("Сервер запущен на порту " + port);
@@ -35,7 +35,7 @@ public class Server {
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-            userService.freeUpResources();
+            userService.shutdown();
         }
     }
 
