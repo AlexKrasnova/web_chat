@@ -7,11 +7,13 @@ import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
+
+import org.apache.commons.io.FileUtils;
+
 import java.net.Socket;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ResourceBundle;
 
 public class Controller implements Initializable {
@@ -59,21 +61,13 @@ public class Controller implements Initializable {
 
     public void setUsername(String username) {
         this.username = username;
-        if (username != null) {
-            loginPanel.setVisible(false);
-            loginPanel.setManaged(false);
-            messagePanel.setVisible(true);
-            messagePanel.setManaged(true);
-            rightPanel.setVisible(true);
-            rightPanel.setManaged(true);
-        } else {
-            loginPanel.setVisible(true);
-            loginPanel.setManaged(true);
-            messagePanel.setVisible(false);
-            messagePanel.setManaged(false);
-            rightPanel.setVisible(false);
-            rightPanel.setManaged(false);
-        }
+        boolean usernameIsNull = username == null;
+        loginPanel.setVisible(usernameIsNull);
+        loginPanel.setManaged(usernameIsNull);
+        messagePanel.setVisible(!usernameIsNull);
+        messagePanel.setManaged(!usernameIsNull);
+        rightPanel.setVisible(!usernameIsNull);
+        rightPanel.setManaged(!usernameIsNull);
     }
 
     public void sendMessage() {
@@ -82,16 +76,7 @@ public class Controller implements Initializable {
             if (message.equals(CLEAR)) {
                 textArea.clear();
                 return;
-            } /*else if (message.startsWith(CHANGE_ACCOUNT)) {
-                String[] tokens = message.split("\\s");
-                if (tokens.length < 2) {
-                    Alert alert = new Alert(Alert.AlertType.ERROR, "Имя пользователя не может быть пустым", ButtonType.OK);
-                    alert.showAndWait();
-                }
-                exit();
-                loginWithLoginAndPassword(tokens[1]);
-                return;
-            }*/
+            }
             out.writeUTF(message);
             messageField.clear();
             messageField.requestFocus();
@@ -161,19 +146,40 @@ public class Controller implements Initializable {
                         }
                     }
 
-                    // Цикл общения
-                    while (true) {
-                        String message = in.readUTF();
-                        if (message.startsWith("/")) {
-                            if (message.equals(EXIT)) {
-                                textArea.clear();
-                                break;
-                            } else {
-                                handleCommandMessage(message);
-                                continue;
+                    //todo: Изучить вопрос про BufferedReader, возможно лучше использовать его
+                    File historyFile = new File(username + "-history.txt");
+                    if (historyFile.exists()) {
+                        try (InputStreamReader reader = new InputStreamReader(new FileInputStream(username + "-history.txt"))) {
+                            int x;
+                            StringBuffer stringBuffer = new StringBuffer("");
+                            while ((x = reader.read()) != -1) {
+                                stringBuffer.append((char) x);
                             }
+                            textArea.appendText(stringBuffer.toString());
+                        } catch (IOException e) {
+                            e.printStackTrace();
                         }
-                        textArea.appendText(message + "\n");
+                    }
+
+                    String fileName = username + "-history.txt";
+                    try (OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(fileName, true), StandardCharsets.UTF_8)) {
+
+                        // Цикл общения
+                        while (true) {
+                            String message = in.readUTF();
+                            if (message.startsWith("/")) {
+                                if (message.equals(EXIT)) {
+                                    textArea.clear();
+                                    break;
+                                } else {
+                                    handleCommandMessage(message);
+                                    continue;
+                                }
+                            }
+                            writer.write(message + "\n");
+                            textArea.appendText(message + "\n");
+                        }
+
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -241,7 +247,17 @@ public class Controller implements Initializable {
             });
             return;
         } else if (message.startsWith(CHANGE_NICKNAME)) {
+            //todo: Попробовать изменять имя файла или пересохранять историю в новый файл при смене ника. Или хранить на клиенте логин, и файл истории привязывать к логину
+            //String oldUsername = username;
             setUsername(message.split("\\s")[1]);
+            /*File oldHistoryFile = new File(oldUsername + "-history.txt");
+            File newHistoryFile = new File(username+"-history.txt");
+            try {
+                FileUtils.copyFile(oldHistoryFile, newHistoryFile);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            oldHistoryFile.delete();*/
             Platform.runLater(() -> {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION, "Ваш новый ник: " + message.split("\\s", 2)[1], ButtonType.OK);
                 alert.showAndWait();

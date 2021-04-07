@@ -1,3 +1,4 @@
 /.idea/
-/target/
 /web_chat.iml
+/client/target/
+/server/target/
