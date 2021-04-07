@@ -10,17 +10,21 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Server {
     private int port;
-    List<ClientHandler> clients;
-    UserService userService;
+    private List<ClientHandler> clients;
+    private UserService userService;
+    private ExecutorService executorService;
 
     public Server(int port) {
         this.port = port;
         clients = new ArrayList<>();
         userService = new DatabaseUserService();
         userService.init();
+        executorService = Executors.newCachedThreadPool();
         try (ServerSocket serverSocket = new ServerSocket(port)) {
 
             System.out.println("Сервер запущен на порту " + port);
@@ -36,7 +40,16 @@ public class Server {
             e.printStackTrace();
         } finally {
             userService.shutdown();
+            executorService.shutdown();
         }
+    }
+
+    public ExecutorService getExecutorService() {
+        return executorService;
+    }
+
+    public UserService getUserService() {
+        return userService;
     }
 
     public void subscribe(ClientHandler clientHandler) {

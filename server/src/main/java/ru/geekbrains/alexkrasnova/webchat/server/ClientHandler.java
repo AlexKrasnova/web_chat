@@ -24,10 +24,10 @@ public class ClientHandler {
     private final String CHANGE_NICKNAME = "/change_nickname ";
 
 
-    private final Server SERVER;
-    private final Socket SOCKET;
-    private final DataInputStream IN;
-    private final DataOutputStream OUT;
+    private Server server;
+    private Socket socket;
+    private DataInputStream in;
+    private DataOutputStream out;
     private User user;
 
     public String getUsername() {
@@ -35,22 +35,22 @@ public class ClientHandler {
     }
 
     public ClientHandler(Server server, Socket socket) throws IOException {
-        this.SERVER = server;
-        this.SOCKET = socket;
-        IN = new DataInputStream(socket.getInputStream());
-        OUT = new DataOutputStream(socket.getOutputStream());
-        new Thread(() -> {
+        this.server = server;
+        this.socket = socket;
+        in = new DataInputStream(socket.getInputStream());
+        out = new DataOutputStream(socket.getOutputStream());
+        this.server.getExecutorService().execute(() -> {
             try {
                 // Цикл авторизации
                 login();
 
                 // Цикл общения
                 while (true) {
-                    String message = IN.readUTF();
+                    String message = in.readUTF();
                     if (message.startsWith(COMMAND_MESSAGE_SYMBOL) && !message.startsWith(LOGIN)) {
                         if (message.equals(EXIT)) {
-                            OUT.writeUTF(message);
-                            SOCKET.close();
+                            out.writeUTF(message);
+                            this.socket.close();
                             server.unsubscribe(this);
                             System.out.println("Клиент отключился");
                             break;
@@ -69,14 +69,14 @@ public class ClientHandler {
             } finally {
                 disconnect();
             }
-        }).start();
+        });
     }
 
     public void disconnect() {
-        SERVER.unsubscribe(this);
-        if (SOCKET != null) {
+        server.unsubscribe(this);
+        if (socket != null) {
             try {
-                SOCKET.close();
+                socket.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -85,7 +85,7 @@ public class ClientHandler {
 
     public void sendMessage(String message) {
         try {
-            OUT.writeUTF(message);
+            out.writeUTF(message);
         } catch (IOException e) {
             disconnect();
         }
@@ -100,7 +100,7 @@ public class ClientHandler {
                 String addresseeUsername = message.split("\\s", 3)[1];
                 String msg = message.split("\\s", 3)[2];
                 try {
-                    SERVER.sendMessage(this, addresseeUsername, msg);
+                    server.sendMessage(this, addresseeUsername, msg);
                 } catch (NoSuchClientException e) {
                     sendMessage(ERROR + e.getMessage());
                 }
@@ -118,10 +118,10 @@ public class ClientHandler {
             }
             String oldUsername = user.getUsername();
             try {
-                user = SERVER.userService.changeUsernameAndGetUser(user.getLogin(), tokens[1]);
+                user = server.getUserService().changeUsernameAndGetUser(user.getLogin(), tokens[1]);
                 sendMessage(message);
-                SERVER.broadcastMessage("Клиент " + oldUsername + " сменил ник на " + user.getUsername());
-                SERVER.broadcastClientsList();
+                server.broadcastMessage("Клиент " + oldUsername + " сменил ник на " + user.getUsername());
+                server.broadcastClientsList();
             } catch (UsernameAlreadyExistsException e) {
                 sendMessage("/error " + e.getMessage());
             }
@@ -140,7 +140,7 @@ public class ClientHandler {
 
     private void login() throws IOException {
         while (true) {
-            String message = IN.readUTF();
+            String message = in.readUTF();
             try {
                 tryToLogin(message);
                 break;
@@ -154,13 +154,13 @@ public class ClientHandler {
         String[] tokens = message.split("\\s");
         String login = tokens[1];
         String password = tokens[2];
-        User userTemp = SERVER.userService.checkCredentialsAndGetUser(login, password);
-        if (SERVER.isUserOnline(userTemp)) {
+        User userTemp = server.getUserService().checkCredentialsAndGetUser(login, password);
+        if (server.isUserOnline(userTemp)) {
             throw new AuthenticationException("Данная учетная запись уже используется");
         }
         user = userTemp;
         sendMessage(LOGIN_OK + user.getUsername());
-        SERVER.subscribe(this);
+        server.subscribe(this);
     }
 
     public User getUser() {
