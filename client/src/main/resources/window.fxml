@@ -16,7 +16,7 @@
          <HBox.margin>
             <Insets left="20.0" right="10.0" />
          </HBox.margin></Label>
-        <TextField fx:id="passwordField" onAction="#login" promptText="Введите пароль..." HBox.hgrow="ALWAYS" />
+        <PasswordField fx:id="passwordField" onAction="#login" promptText="Введите пароль..." HBox.hgrow="ALWAYS" />
         <Button maxWidth="150" minWidth="150" onAction="#login" prefWidth="150" text="Вход" />
     </HBox>
 

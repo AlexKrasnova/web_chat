@@ -1,7 +1,6 @@
 package ru.geekbrains.alexkrasnova.webchat.server;
 
 import ru.geekbrains.alexkrasnova.webchat.server.exception.NoSuchClientException;
-import ru.geekbrains.alexkrasnova.webchat.server.user.User;
 import ru.geekbrains.alexkrasnova.webchat.server.user.service.DatabaseUserService;
 import ru.geekbrains.alexkrasnova.webchat.server.user.service.UserService;
 
@@ -42,6 +41,8 @@ public class Server {
             userService.shutdown();
             executorService.shutdown();
         }
+        //todo: подумать, где правильно отключатья от бд, и стоит ли оставлять метод disconnect() в интерфейсе UserService
+        userService.disconnect();
     }
 
     public ExecutorService getExecutorService() {
@@ -93,9 +94,9 @@ public class Server {
         }
     }
 
-    public boolean isUserOnline(User user) {
+    public boolean isUserOnline(String username) {
         for (ClientHandler clientHandler : clients) {
-            if (clientHandler.getUser().equals(user)) {
+            if (clientHandler.getUsername().equals(username)) {
                 return true;
             }
         }
