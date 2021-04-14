@@ -1,5 +1,8 @@
 package ru.geekbrains.alexkrasnova.webchat.server;
 
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.NoSuchClientException;
 import ru.geekbrains.alexkrasnova.webchat.server.user.User;
 import ru.geekbrains.alexkrasnova.webchat.server.user.service.DatabaseUserService;
@@ -14,6 +17,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Server {
+
+    public static final Logger LOGGER = LogManager.getLogger(Server.class);
+
     private int port;
     private List<ClientHandler> clients;
     private UserService userService;
@@ -27,17 +33,17 @@ public class Server {
         executorService = Executors.newCachedThreadPool();
         try (ServerSocket serverSocket = new ServerSocket(port)) {
 
-            System.out.println("Сервер запущен на порту " + port);
+            LOGGER.info("Сервер запущен на порту " + port);
 
             while (true) {
-                System.out.println("Ожидание подключения нового клиента...");
+                LOGGER.info("Ожидание подключения нового клиента...");
                 Socket socket = serverSocket.accept();
-                System.out.println("Клиент подключился");
+                LOGGER.info("Клиент подключился");
                 new ClientHandler(this, socket);
             }
 
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.throwing(Level.ERROR, e);
         } finally {
             userService.shutdown();
             executorService.shutdown();

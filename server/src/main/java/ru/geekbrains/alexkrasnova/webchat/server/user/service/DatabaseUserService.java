@@ -1,5 +1,7 @@
 package ru.geekbrains.alexkrasnova.webchat.server.user.service;
 
+import org.apache.logging.log4j.Level;
+import ru.geekbrains.alexkrasnova.webchat.server.Server;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.AuthenticationException;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.UsernameAlreadyExistsException;
 import ru.geekbrains.alexkrasnova.webchat.server.user.User;
@@ -17,7 +19,7 @@ public class DatabaseUserService implements UserService {
             dropAndCreateTable();
             fillTable();
         } catch (SQLException e) {
-            e.printStackTrace();
+            Server.LOGGER.throwing(Level.ERROR, e);
         }
 
     }
@@ -33,7 +35,7 @@ public class DatabaseUserService implements UserService {
                 throw new AuthenticationException("Неверный пароль");
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            Server.LOGGER.throwing(Level.ERROR, e);
         }
         throw new AuthenticationException("Логин не найден");
     }
@@ -49,7 +51,7 @@ public class DatabaseUserService implements UserService {
             throw new UsernameAlreadyExistsException();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            Server.LOGGER.throwing(Level.ERROR, e);
         }
     }
 
@@ -60,7 +62,7 @@ public class DatabaseUserService implements UserService {
                 return true;
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            Server.LOGGER.throwing(Level.ERROR, e);
         }
         return false;
     }
@@ -72,7 +74,7 @@ public class DatabaseUserService implements UserService {
                 return new User(rs.getString(1), rs.getString(2), rs.getString(3));
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            Server.LOGGER.throwing(Level.ERROR, e);
         }
         //todo: Разобраться, какое исключение здесь выбрасывать
         throw new RuntimeException("Пользователь не найден");
@@ -85,7 +87,7 @@ public class DatabaseUserService implements UserService {
             databaseConnection.getStmt().executeUpdate(query);
             return getUserByLogin(login);
         } catch (SQLException e) {
-            e.printStackTrace();
+            Server.LOGGER.throwing(Level.ERROR, e);
         }
         throw new UsernameAlreadyExistsException();
     }
