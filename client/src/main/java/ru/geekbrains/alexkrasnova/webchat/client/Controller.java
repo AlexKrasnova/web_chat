@@ -8,12 +8,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import java.io.*;
-
-import org.apache.commons.io.FileUtils;
-
-import java.net.Socket;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ResourceBundle;
 
 public class Controller implements Initializable {
@@ -22,9 +17,9 @@ public class Controller implements Initializable {
     private final String LOGIN = "/login ";
     private final String LOGIN_FAILED = "/login_failed ";
     private final String LOGIN_OK = "/login_ok ";
+    private final String CHANGE_ACCOUNT = "/change_account ";
     private final String EXIT = "/exit";
     private final String CLEAR = "/clear";
-    private final String CHANGE_ACCOUNT = "/change_account ";
     private final String CHANGE_NICKNAME = "/change_nickname ";
     private final String ERROR = "/error ";
     private final String CLIENTS_LIST = "/clients_list ";
@@ -48,15 +43,46 @@ public class Controller implements Initializable {
     @FXML
     VBox rightPanel;
 
-    private Socket socket;
-    private DataInputStream in;
-    private DataOutputStream out;
-    private Thread listeningThread;
     private String username;
+    private HistoryManager historyManager;
+    private Network network;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         setUsername(null);
+        historyManager = new HistoryManager();
+        network = new Network();
+
+        network.setOnAuthOkCallback(args -> {
+            String message = (String) args[0];
+            setUsername(message.split("\\s")[2]);
+            historyManager.init(message.split("\\s")[1]);
+            textArea.clear();
+            textArea.appendText(historyManager.load());
+        });
+
+        network.setOnAuthFailedCallback(args -> {
+            String message = (String) args[0];
+            Platform.runLater(() -> {
+                showErrorAlert(message.split("\\s", 2)[1]);
+            });
+        });
+
+        network.setOnMessageReceivedCallback(args -> {
+            String message = (String) args[0];
+            if (message.startsWith(COMMAND_MESSAGE_SYMBOL)) {
+                handleCommandMessage(message);
+                return;
+            }
+            historyManager.write(message + "\n");
+            textArea.appendText(message + "\n");
+        });
+
+        network.setOnDisconnectCallback(args -> {
+            setUsername(null);
+            historyManager.close();
+            textArea.clear();
+        });
     }
 
     public void setUsername(String username) {
@@ -77,169 +103,56 @@ public class Controller implements Initializable {
                 textArea.clear();
                 return;
             }
-            out.writeUTF(message);
+            network.sendMessage(messageField.getText());
             messageField.clear();
             messageField.requestFocus();
-            if (message.equals(EXIT)) {
-                try {
-                    listeningThread.join();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                disconnect();
-                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Процесс обмена сообщениями завершен", ButtonType.OK);
-                alert.showAndWait();
-            }
         } catch (IOException e) {
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Невозможно отправить сообщение", ButtonType.OK);
-            alert.showAndWait();
+            showErrorAlert("Невозможно отправить сообщение");
         }
     }
 
 
     public void login() {
 
-        if (loginField.getText().isEmpty() || passwordField.getText().isEmpty()) {
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Логин и пароль не могут быть пустыми", ButtonType.OK);
-            alert.showAndWait();
+        if (loginField.getText().isEmpty() && passwordField.getText().isEmpty()) {
+            showErrorAlert("Логин и пароль не могут быть пустыми");
             return;
         }
 
-        loginWithLoginAndPassword(loginField.getText(), passwordField.getText());
-    }
-
-    public void loginWithLoginAndPassword(String login, String password) {
-
-        if (socket == null || socket.isClosed()) {
-            connect();
-        }
-
-        try {
-            out.writeUTF(LOGIN + login + " " + password);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void connect() {
-
-        try {
-            socket = new Socket("localhost", 8189);
-            in = new DataInputStream(socket.getInputStream());
-            out = new DataOutputStream(socket.getOutputStream());
-
-            listeningThread = new Thread(() -> {
-
-                try {
-                    // Цикл авторизации
-                    while (true) {
-                        String message = in.readUTF();
-                        if (message.startsWith(LOGIN_OK)) {
-                            setUsername(message.split("\\s")[1]);
-                            break;
-                        }
-                        if (message.startsWith(LOGIN_FAILED)) {
-                            Platform.runLater(() -> {
-                                Alert alert = new Alert(Alert.AlertType.ERROR, message.split("\\s", 2)[1], ButtonType.OK);
-                                alert.showAndWait();
-                            });
-                        }
-                    }
-
-                    //todo: Изучить вопрос про BufferedReader, возможно лучше использовать его
-                    File historyFile = new File(username + "-history.txt");
-                    if (historyFile.exists()) {
-                        try (InputStreamReader reader = new InputStreamReader(new FileInputStream(username + "-history.txt"))) {
-                            int x;
-                            StringBuffer stringBuffer = new StringBuffer("");
-                            while ((x = reader.read()) != -1) {
-                                stringBuffer.append((char) x);
-                            }
-                            textArea.appendText(stringBuffer.toString());
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-
-                    String fileName = username + "-history.txt";
-                    try (OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(fileName, true), StandardCharsets.UTF_8)) {
-
-                        // Цикл общения
-                        while (true) {
-                            String message = in.readUTF();
-                            if (message.startsWith("/")) {
-                                if (message.equals(EXIT)) {
-                                    textArea.clear();
-                                    break;
-                                } else {
-                                    handleCommandMessage(message);
-                                    continue;
-                                }
-                            }
-                            writer.write(message + "\n");
-                            textArea.appendText(message + "\n");
-                        }
-
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } finally {
-                    disconnect();
-                }
-            });
-            listeningThread.start();
-        } catch (IOException e) {
-            throw new RuntimeException("Unable to connect to server [ localhost:8189 ]");
-        }
-    }
-
-    public void disconnect() {
-        setUsername(null);
-        try {
-            if (socket != null) {
-                socket.close();
+        if (!network.isConnected()) {
+            try {
+                network.connect(8189);
+            } catch (IOException e) {
+                showErrorAlert("Невозможно подключиться к серверу на порт: " + 8189);
+                return;
             }
+        }
+
+        try {
+            network.tryToLogin(loginField.getText(), passwordField.getText());
         } catch (IOException e) {
-            e.printStackTrace();
+            showErrorAlert("Невозможно отправить данные пользователя");
         }
     }
 
     public void exit() {
-        if (socket != null) {
-            try {
-                out.writeUTF(EXIT);
-                messageField.clear();
-                messageField.requestFocus();
-                try {
-                    listeningThread.join();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                disconnect();
-                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Процесс обмена сообщениями завершен", ButtonType.OK);
-                alert.showAndWait();
-
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                disconnect();
-            }
+        try {
+            network.sendMessage(EXIT);
+        } catch (IOException e) {
+            showErrorAlert("Невозможно выйти");
         }
     }
 
     private void handleCommandMessage(String message) {
         if (message.startsWith(ERROR)) {
             Platform.runLater(() -> {
-                Alert alert = new Alert(Alert.AlertType.ERROR, message.split("\\s", 2)[1], ButtonType.OK);
-                alert.showAndWait();
+                showErrorAlert(message.split("\\s", 2)[1]);
             });
             return;
         } else if (message.startsWith(CLIENTS_LIST)) {
-            // /clients_list Bob Max Jack
             String[] tokens = message.split("\\s");
 
             Platform.runLater(() -> {
-                System.out.println(Thread.currentThread().getName());
                 clientsList.getItems().clear();
                 for (int i = 1; i < tokens.length; i++) {
                     clientsList.getItems().add(tokens[i]);
@@ -247,17 +160,7 @@ public class Controller implements Initializable {
             });
             return;
         } else if (message.startsWith(CHANGE_NICKNAME)) {
-            //todo: Попробовать изменять имя файла или пересохранять историю в новый файл при смене ника. Или хранить на клиенте логин, и файл истории привязывать к логину
-            //String oldUsername = username;
             setUsername(message.split("\\s")[1]);
-            /*File oldHistoryFile = new File(oldUsername + "-history.txt");
-            File newHistoryFile = new File(username+"-history.txt");
-            try {
-                FileUtils.copyFile(oldHistoryFile, newHistoryFile);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            oldHistoryFile.delete();*/
             Platform.runLater(() -> {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION, "Ваш новый ник: " + message.split("\\s", 2)[1], ButtonType.OK);
                 alert.showAndWait();
@@ -265,5 +168,13 @@ public class Controller implements Initializable {
             return;
         }
 
+    }
+
+    private void showErrorAlert(String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setContentText(message);
+        alert.setTitle("Web Chat FX");
+        alert.setHeaderText(null);
+        alert.showAndWait();
     }
 }

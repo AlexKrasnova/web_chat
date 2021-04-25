@@ -166,7 +166,7 @@ public class ClientHandler {
             throw new AuthenticationException("Данная учетная запись уже используется");
         }
         user = userTemp;
-        sendMessage(LOGIN_OK + user.getUsername());
+        sendMessage(LOGIN_OK + user.getLogin() + " " + user.getUsername());
         server.subscribe(this);
     }
 
