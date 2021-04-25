@@ -1,37 +1,61 @@
 package ru.geekbrains.alexkrasnova.webchat.server;
 
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.NoSuchClientException;
+import ru.geekbrains.alexkrasnova.webchat.server.user.User;
+import ru.geekbrains.alexkrasnova.webchat.server.user.service.DatabaseUserService;
+import ru.geekbrains.alexkrasnova.webchat.server.user.service.UserService;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Server {
+
+    public static final Logger LOGGER = LogManager.getLogger(Server.class);
+
     private int port;
-    List<ClientHandler> clients;
-    UserService userService;
+    private List<ClientHandler> clients;
+    private UserService userService;
+    private ExecutorService executorService;
 
     public Server(int port) {
         this.port = port;
         clients = new ArrayList<>();
-        userService = initializeUserService();
+        userService = new DatabaseUserService();
+        userService.init();
+        executorService = Executors.newCachedThreadPool();
         try (ServerSocket serverSocket = new ServerSocket(port)) {
 
-            System.out.println("Сервер запущен на порту " + port);
+            LOGGER.info("Сервер запущен на порту " + port);
 
             while (true) {
-                System.out.println("Ожидание подключения нового клиента...");
+                LOGGER.info("Ожидание подключения нового клиента...");
                 Socket socket = serverSocket.accept();
-                System.out.println("Клиент подключился");
+                LOGGER.info("Клиент подключился");
                 new ClientHandler(this, socket);
             }
+
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.throwing(Level.ERROR, e);
+        } finally {
+            userService.shutdown();
+            executorService.shutdown();
         }
+    }
+
+    public ExecutorService getExecutorService() {
+        return executorService;
+    }
+
+    public UserService getUserService() {
+        return userService;
     }
 
     public void subscribe(ClientHandler clientHandler) {
@@ -75,31 +99,13 @@ public class Server {
         }
     }
 
-    public boolean isUserOnline(String username) {
+    public boolean isUserOnline(User user) {
         for (ClientHandler clientHandler : clients) {
-            if (clientHandler.getUsername().equals(username)) {
+            if (clientHandler.getUser().equals(user)) {
                 return true;
             }
         }
         return false;
-    }
-
-    private UserService initializeUserService() {
-        UserService userService = new UserService();
-        userService.addUser(new User("bob@gmail.com", "bob1997", "Bob"));
-        userService.addUser(new User("john@gmail.com", "john1990", "John"));
-        userService.addUser(new User("jack@gmail.com", "jack1980", "Jack"));
-        userService.addUser(new User("max@gmail.com", "1234", "Max"));
-        userService.addUser(new User("ann@gmail.com", "4321", "Ann"));
-        userService.addUser(new User("cathrine@gmail.com", "1111", "Cat"));
-        userService.addUser(new User("mary@gmail.com", "222", "Mary"));
-        userService.addUser(new User("vasya@yandex.ru", "1", "Vasya"));
-        userService.addUser(new User("gosha@yandex.ru", "22222", "Gosha"));
-        userService.addUser(new User("sasha@mail.ru", "333", "Sasha"));
-        userService.addUser(new User("yana@gmail.com", "666", "Yana"));
-        userService.addUser(new User("vika@mail.ru", "666", "Vika"));
-        userService.addUser(new User("oleg@mail.ru", "1234", "Oleg"));
-        return userService;
     }
 
 }

@@ -1,9 +1,11 @@
 package ru.geekbrains.alexkrasnova.webchat.server;
 
+import org.apache.logging.log4j.Level;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.InvalidCommandMessageException;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.UsernameAlreadyExistsException;
-import ru.geekbrains.alexkrasnova.webchat.server.exception.loginFailedException.LoginFailedException;
+import ru.geekbrains.alexkrasnova.webchat.server.exception.AuthenticationException;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.NoSuchClientException;
+import ru.geekbrains.alexkrasnova.webchat.server.user.User;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -23,10 +25,10 @@ public class ClientHandler {
     private final String CHANGE_NICKNAME = "/change_nickname ";
 
 
-    private final Server SERVER;
-    private final Socket SOCKET;
-    private final DataInputStream IN;
-    private final DataOutputStream OUT;
+    private Server server;
+    private Socket socket;
+    private DataInputStream in;
+    private DataOutputStream out;
     private User user;
 
     public String getUsername() {
@@ -34,22 +36,22 @@ public class ClientHandler {
     }
 
     public ClientHandler(Server server, Socket socket) throws IOException {
-        this.SERVER = server;
-        this.SOCKET = socket;
-        IN = new DataInputStream(socket.getInputStream());
-        OUT = new DataOutputStream(socket.getOutputStream());
-        new Thread(() -> {
+        this.server = server;
+        this.socket = socket;
+        in = new DataInputStream(socket.getInputStream());
+        out = new DataOutputStream(socket.getOutputStream());
+        this.server.getExecutorService().execute(() -> {
             try {
                 // Цикл авторизации
                 login();
 
                 // Цикл общения
                 while (true) {
-                    String message = IN.readUTF();
+                    String message = in.readUTF();
                     if (message.startsWith(COMMAND_MESSAGE_SYMBOL) && !message.startsWith(LOGIN)) {
                         if (message.equals(EXIT)) {
-                            OUT.writeUTF(message);
-                            SOCKET.close();
+                            out.writeUTF(message);
+                            this.socket.close();
                             server.unsubscribe(this);
                             System.out.println("Клиент отключился");
                             break;
@@ -58,36 +60,39 @@ public class ClientHandler {
                             handleCommandMessage(message);
                         } catch (InvalidCommandMessageException e) {
                             sendMessage(ERROR + e.getMessage());
+                            Server.LOGGER.debug("Ошибка ввода пользовательских данных: " + e.getMessage(), e);
                         }
                         continue;
                     }
                     server.broadcastMessage(user.getUsername() + ": " + message);
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                Server.LOGGER.throwing(Level.ERROR, e);
             } finally {
                 disconnect();
             }
-        }).start();
+        });
     }
 
     public void disconnect() {
-        SERVER.unsubscribe(this);
-        if (SOCKET != null) {
+        server.unsubscribe(this);
+        if (socket != null) {
             try {
-                SOCKET.close();
+                socket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                Server.LOGGER.throwing(Level.ERROR, e);
             }
         }
     }
 
     public void sendMessage(String message) {
         try {
-            OUT.writeUTF(message);
+            out.writeUTF(message);
         } catch (IOException e) {
+            Server.LOGGER.throwing(Level.ERROR, e);
             disconnect();
         }
+
     }
 
     private void handleCommandMessage(String message) throws IOException, InvalidCommandMessageException {
@@ -99,16 +104,17 @@ public class ClientHandler {
                 String addresseeUsername = message.split("\\s", 3)[1];
                 String msg = message.split("\\s", 3)[2];
                 try {
-                    SERVER.sendMessage(this, addresseeUsername, msg);
+                    server.sendMessage(this, addresseeUsername, msg);
                 } catch (NoSuchClientException e) {
                     sendMessage(ERROR + e.getMessage());
+                    Server.LOGGER.debug("Ошибка ввода пользовательских данных: " + e.getMessage(), e);
                 }
             } else if (privatMessageArray.length <= 1) {
                 throw new InvalidCommandMessageException("Имя адресата не может быть пустым");
             } else {
                 throw new InvalidCommandMessageException("Текст личного сообщения не может быть пустым");
             }
-        } else if(message.startsWith(PRIVATE_MESSAGE.split("\\s")[0])) {
+        } else if (message.startsWith(PRIVATE_MESSAGE.split("\\s")[0])) {
             throw new InvalidCommandMessageException("Имя адресата не может быть пустым");
         } else if (message.startsWith(CHANGE_NICKNAME)) {
             String[] tokens = message.split("\\s");
@@ -117,13 +123,13 @@ public class ClientHandler {
             }
             String oldUsername = user.getUsername();
             try {
-
-                user.setUsername(tokens[1]);
+                user = server.getUserService().changeUsernameAndGetUser(user.getLogin(), tokens[1]);
                 sendMessage(message);
-                SERVER.broadcastMessage("Клиент " + oldUsername + " сменил ник на " + user.getUsername());
-                SERVER.broadcastClientsList();
+                server.broadcastMessage("Клиент " + oldUsername + " сменил ник на " + user.getUsername());
+                server.broadcastClientsList();
             } catch (UsernameAlreadyExistsException e) {
                 sendMessage("/error " + e.getMessage());
+                Server.LOGGER.debug("Ошибка ввода пользовательских данных: " + e.getMessage(), e);
             }
             /*            if(SERVER.isUserOnline(tokens[1])){
                 sendMessage("/error Данное имя пользователя уже занято");
@@ -132,7 +138,7 @@ public class ClientHandler {
 
             username = tokens[1];*/
 
-        } else if(message.startsWith(CHANGE_NICKNAME.split("\\s")[0])) {
+        } else if (message.startsWith(CHANGE_NICKNAME.split("\\s")[0])) {
             throw new InvalidCommandMessageException("Имя пользователя не может быть пустым");
         }
 
@@ -140,30 +146,31 @@ public class ClientHandler {
 
     private void login() throws IOException {
         while (true) {
-            String message = IN.readUTF();
+            String message = in.readUTF();
             try {
                 tryToLogin(message);
                 break;
-            } catch (LoginFailedException e) {
+            } catch (AuthenticationException e) {
                 sendMessage(LOGIN_FAILED + " " + e.getMessage());
+                Server.LOGGER.debug("Ошибка ввода пользовательских данных: " + e.getMessage(), e);
             }
         }
     }
 
-    private void tryToLogin(String message) throws IOException, LoginFailedException {
+    private void tryToLogin(String message) throws AuthenticationException {
         String[] tokens = message.split("\\s");
         String login = tokens[1];
         String password = tokens[2];
-        String usernameFromLogin = SERVER.userService.checkCredentialsAndGetUsername(login, password);
-
-        if (SERVER.isUserOnline(usernameFromLogin)) {
-            throw new LoginFailedException("Данное имя пользователя уже занято");
+        User userTemp = server.getUserService().checkCredentialsAndGetUser(login, password);
+        if (server.isUserOnline(userTemp)) {
+            throw new AuthenticationException("Данная учетная запись уже используется");
         }
-
-        user = SERVER.userService.getUserByLogin(login);
-
+        user = userTemp;
         sendMessage(LOGIN_OK + user.getUsername());
-        SERVER.subscribe(this);
+        server.subscribe(this);
     }
 
+    public User getUser() {
+        return user;
+    }
 }
