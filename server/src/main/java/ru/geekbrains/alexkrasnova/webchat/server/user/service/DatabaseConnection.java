@@ -1,5 +1,8 @@
 package ru.geekbrains.alexkrasnova.webchat.server.user.service;
 
+import org.apache.logging.log4j.Level;
+import ru.geekbrains.alexkrasnova.webchat.server.Server;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -32,15 +35,15 @@ public class DatabaseConnection {
         if (stmt != null) {
             try {
                 stmt.close();
-            } catch (SQLException throwables) {
-                throwables.printStackTrace();
+            } catch (SQLException e) {
+                Server.LOGGER.throwing(Level.ERROR, e);
             }
         }
         if (connection != null) {
             try {
                 connection.close();
-            } catch (SQLException throwables) {
-                throwables.printStackTrace();
+            } catch (SQLException e) {
+                Server.LOGGER.throwing(Level.ERROR, e);
             }
         }
     }

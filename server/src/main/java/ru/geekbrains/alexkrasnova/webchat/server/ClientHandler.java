@@ -1,5 +1,6 @@
 package ru.geekbrains.alexkrasnova.webchat.server;
 
+import org.apache.logging.log4j.Level;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.InvalidCommandMessageException;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.UsernameAlreadyExistsException;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.AuthenticationException;
@@ -59,13 +60,14 @@ public class ClientHandler {
                             handleCommandMessage(message);
                         } catch (InvalidCommandMessageException e) {
                             sendMessage(ERROR + e.getMessage());
+                            Server.LOGGER.debug("Ошибка ввода пользовательских данных: " + e.getMessage(), e);
                         }
                         continue;
                     }
                     server.broadcastMessage(user.getUsername() + ": " + message);
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                Server.LOGGER.throwing(Level.ERROR, e);
             } finally {
                 disconnect();
             }
@@ -78,7 +80,7 @@ public class ClientHandler {
             try {
                 socket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                Server.LOGGER.throwing(Level.ERROR, e);
             }
         }
     }
@@ -87,8 +89,10 @@ public class ClientHandler {
         try {
             out.writeUTF(message);
         } catch (IOException e) {
+            Server.LOGGER.throwing(Level.ERROR, e);
             disconnect();
         }
+
     }
 
     private void handleCommandMessage(String message) throws IOException, InvalidCommandMessageException {
@@ -103,6 +107,7 @@ public class ClientHandler {
                     server.sendMessage(this, addresseeUsername, msg);
                 } catch (NoSuchClientException e) {
                     sendMessage(ERROR + e.getMessage());
+                    Server.LOGGER.debug("Ошибка ввода пользовательских данных: " + e.getMessage(), e);
                 }
             } else if (privatMessageArray.length <= 1) {
                 throw new InvalidCommandMessageException("Имя адресата не может быть пустым");
@@ -124,6 +129,7 @@ public class ClientHandler {
                 server.broadcastClientsList();
             } catch (UsernameAlreadyExistsException e) {
                 sendMessage("/error " + e.getMessage());
+                Server.LOGGER.debug("Ошибка ввода пользовательских данных: " + e.getMessage(), e);
             }
             /*            if(SERVER.isUserOnline(tokens[1])){
                 sendMessage("/error Данное имя пользователя уже занято");
@@ -146,6 +152,7 @@ public class ClientHandler {
                 break;
             } catch (AuthenticationException e) {
                 sendMessage(LOGIN_FAILED + " " + e.getMessage());
+                Server.LOGGER.debug("Ошибка ввода пользовательских данных: " + e.getMessage(), e);
             }
         }
     }
