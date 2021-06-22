@@ -3,6 +3,7 @@ package ru.geekbrains.alexkrasnova.webchat.server.user.service;
 import org.apache.logging.log4j.Level;
 import ru.geekbrains.alexkrasnova.webchat.server.Server;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.AuthenticationException;
+import ru.geekbrains.alexkrasnova.webchat.server.exception.LoginAlreadyExistsException;
 import ru.geekbrains.alexkrasnova.webchat.server.exception.UsernameAlreadyExistsException;
 import ru.geekbrains.alexkrasnova.webchat.server.user.User;
 
@@ -41,14 +42,17 @@ public class DatabaseUserService implements UserService {
     }
 
     @Override
-    public void addUser(User user) throws UsernameAlreadyExistsException {
+    public void addUser(User user) throws UsernameAlreadyExistsException, LoginAlreadyExistsException {
         try {
-            if (!isUsernameBusy(user.getUsername())) {
-                String query = String.format("insert into users (login, password, username) values ('%s', '%s', '%s');", user.getLogin(), user.getPassword(), user.getUsername());
-                databaseConnection.getStmt().executeUpdate(query);
-                return;
+            if(!isLoginBusy(user.getLogin())) {
+                if (!isUsernameBusy(user.getUsername())) {
+                    String query = String.format("insert into users (login, password, username) values ('%s', '%s', '%s');", user.getLogin(), user.getPassword(), user.getUsername());
+                    databaseConnection.getStmt().executeUpdate(query);
+                    return;
+                }
+                throw new UsernameAlreadyExistsException();
             }
-            throw new UsernameAlreadyExistsException();
+            throw new LoginAlreadyExistsException();
 
         } catch (SQLException e) {
             Server.LOGGER.throwing(Level.ERROR, e);
@@ -57,6 +61,18 @@ public class DatabaseUserService implements UserService {
 
     private boolean isUsernameBusy(String username) {
         String query = "select id from users where username = '" + username + "';";
+        try (ResultSet rs = databaseConnection.getStmt().executeQuery(query)) {
+            if (rs.next()) {
+                return true;
+            }
+        } catch (SQLException e) {
+            Server.LOGGER.throwing(Level.ERROR, e);
+        }
+        return false;
+    }
+
+    private boolean isLoginBusy(String login) {
+        String query = "select id form users where login = '" + login + "';";
         try (ResultSet rs = databaseConnection.getStmt().executeQuery(query)) {
             if (rs.next()) {
                 return true;
